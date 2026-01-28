@@ -9,11 +9,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unSub = onAuthStateChanged(auth, (firebaseUser) => {
+    const unSubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
     });
-    return () => unSub();
+    return () => unSubscribe();
   }, []);
 
   return (

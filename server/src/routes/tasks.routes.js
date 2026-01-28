@@ -1,57 +1,54 @@
 import express from "express";
 import supabase from "../config/supabase.js";
 import { verifyFirebaseToken } from "../middleware/auth.middleware.js";
+import { getOrCreateUser } from "../services/user.service.js";
+
 const router = express.Router();
 
 router.get("/", verifyFirebaseToken, async (req, res) => {
-  const firebaseUid = req.user;
+  try {
+    const { firebaseUid, email } = req.user;
+    const user = await getOrCreateUser({ firebaseUid, email });
 
-  const { data: user, error: userError } = await supabase
-    .from("users")
-    .select("id")
-    .eq("firebase_uid", firebaseuid)
-    .single();
-  if (userError) {
-    return res.status(500).json({ error: "Failed to fetch user" });
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*")
-    .sq("user_id", user.id)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return res.status(500).json({ error: "Failed to fetch tasks" });
-  }
-
-  res.json(data);
 });
+
 
 router.post("/", verifyFirebaseToken, async (req, res) => {
-  const { title, description } = req.body;
-  const firebaseUid = req.user;
+  try {
+    const { title, description } = req.body;
+    const { firebaseUid, email } = req.user;
 
-  if (!title) {
-    return res.status(400).json({ error: "Title is required" });
+    if (!title) {
+      return res.status(400).json({ error: "Title is required" });
+    }
+    const user = await getOrCreateUser({ firebaseUid, email });
+
+    const { data, error } = await supabase.from("tasks").insert([
+      {
+        user_id: user.id,
+        title,
+        description,
+      },
+    ]);
+
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const { data: user } = await supabase
-    .from("users")
-    .select("id")
-    .eq("firebase_uid", firebaseUid)
-    .single();
-
-  const { data, error } = await supabase.from("tasks").insert([
-    {
-      user_id: user.id,
-      title,
-      description,
-    },
-  ]);
-  if (error) {
-    return res.status(500).json({ error: "Failed to create task" });
-  }
-  res.status(201).json(data);
 });
+
 export default router;
